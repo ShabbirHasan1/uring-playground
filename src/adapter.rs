@@ -13,16 +13,16 @@ use crate::reactor::{OperationHandle, Reactor};
 /// Adapter to implement asynchronous IO traits backed by a standard libary
 /// implementation and the polling facilities from `io_uring` when encountering
 /// `EAGAIN`
-pub struct PollAdapter<'a, I> {
+pub struct PollIo<'a, I> {
     reactor: &'a Reactor,
     operation: Option<OperationHandle>,
     io: I,
 }
 
-impl<'a, I> PollAdapter<'a, I> {
+impl<'a, I> PollIo<'a, I> {
     /// Create the asynchronous IO adapter backed by the provided
     /// implementation
-    pub fn new(reactor: &'a Reactor, io: I) -> Self {
+    pub const fn new(reactor: &'a Reactor, io: I) -> Self {
         Self {
             reactor,
             operation: None,
@@ -31,7 +31,7 @@ impl<'a, I> PollAdapter<'a, I> {
     }
 }
 
-impl<'a, I> PollAdapter<'a, I>
+impl<'a, I> PollIo<'a, I>
 where
     I: AsRawFd + Unpin + 'a,
 {
@@ -49,7 +49,7 @@ where
     }
 }
 
-impl<'a, I> AsyncRead for PollAdapter<'a, I>
+impl<'a, I> AsyncRead for PollIo<'a, I>
 where
     I: Read + AsRawFd + Unpin + 'a,
 {
@@ -84,7 +84,7 @@ where
     }
 }
 
-impl<'a, I> AsyncWrite for PollAdapter<'a, I>
+impl<'a, I> AsyncWrite for PollIo<'a, I>
 where
     I: Write + AsRawFd + Unpin + 'a,
 {

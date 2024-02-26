@@ -10,6 +10,10 @@ use crate::common::DangerCell;
 
 /// Simple poll loop for driving a future to completion concurretly with a
 /// ticker function to act as an event loop
+///
+/// # Errors
+///
+/// If the ticker function returns an error
 pub fn block_on<F, T, E>(future: F, ticker: T) -> Result<F::Output, E>
 where
     F: IntoFuture,
@@ -29,15 +33,17 @@ where
 }
 
 /// Simple executor for spawning an unknown amount of background tasks
-#[derive(Default)]
+#[must_use]
 pub struct Executor {
     tasks: DangerCell<VecDeque<Runnable>>,
 }
 
 impl Executor {
     /// Create a new single threaded FIFO async executor
-    pub fn new() -> Self {
-        Self::default()
+    pub const fn new() -> Self {
+        Self {
+            tasks: DangerCell::new(VecDeque::new()),
+        }
     }
 
     /// Spawn a task to be executed in the background

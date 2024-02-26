@@ -6,7 +6,7 @@ mod executor;
 mod reactor;
 
 pub use crate::{
-    adapter::PollAdapter,
+    adapter::PollIo,
     executor::{block_on, Executor},
     reactor::{OperationHandle, Reactor},
 };

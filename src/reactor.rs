@@ -9,7 +9,8 @@ use slab::Slab;
 
 use crate::common::DangerCell;
 
-/// Simple IO reactor for making io_uring operations
+/// Simple IO reactor for making `io_uring` operations
+#[must_use]
 pub struct Reactor {
     ring: DangerCell<IoUring>,
     operations: DangerCell<Slab<OperationState>>,
@@ -17,26 +18,36 @@ pub struct Reactor {
 
 impl Reactor {
     /// Create a new reactor with the provided ring instance
-    pub fn new(ring: IoUring) -> Self {
+    pub const fn new(ring: IoUring) -> Self {
         Self {
             ring: DangerCell::new(ring),
-            operations: Default::default(),
+            operations: DangerCell::new(Slab::new()),
         }
     }
 
+    /// Make an submission
+    ///
     /// # Safety
+    ///
     /// Submission parameters must remain valid for the duration of the
     /// operation
+    ///
+    /// # Panics
+    ///
+    /// If the created operation's index doesn't fit into user data
+    ///
+    /// # Errors
+    ///
+    /// If submitting the entry fails
     pub unsafe fn submit_operation(
         &self,
         entry: squeue::Entry,
         waker: Option<Waker>,
     ) -> Result<OperationHandle> {
-        let index = self.operations.assume_unique_access().insert(
-            waker
-                .map(OperationState::Waiting)
-                .unwrap_or(OperationState::Submitted),
-        );
+        let index = self
+            .operations
+            .assume_unique_access()
+            .insert(waker.map_or(OperationState::Submitted, OperationState::Waiting));
 
         let entry = entry.user_data(index.try_into().unwrap());
 
@@ -57,6 +68,10 @@ impl Reactor {
     }
 
     /// Poll for the result of an in-flight operation
+    ///
+    /// # Panics
+    ///
+    /// If the operation handle is invalid
     pub fn drive_operation(
         &self,
         operation: OperationHandle,
@@ -111,6 +126,14 @@ impl Reactor {
 
     /// Submit entries to the kernel and process completions, in turn waking
     /// up blocked futures
+    ///
+    /// # Panics
+    ///
+    /// If the user data value isn't a valid operation index
+    ///
+    /// # Errors
+    ///
+    /// If synchronizing with the kernel fails
     pub fn tick(&self) -> Result<()> {
         let mut guard = self.ring.assume_unique_access();
         let (submitter, submission, completion) = guard.split();
@@ -156,14 +179,15 @@ impl Reactor {
 
 /// Strongly typed index referring to an [`OperationState`] instance
 #[derive(Clone, Copy)]
+#[must_use]
 pub struct OperationHandle(usize);
 
 impl OperationHandle {
-    fn from_raw(index: usize) -> Self {
+    const fn from_raw(index: usize) -> Self {
         Self(index)
     }
 
-    fn as_raw(self) -> usize {
+    const fn as_raw(self) -> usize {
         self.0
     }
 }

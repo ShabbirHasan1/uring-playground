@@ -23,9 +23,7 @@ impl<T> DangerCell<T> {
     }
 
     pub fn assume_unique_access(&self) -> AccessGuard<'_, T> {
-        if self.borrowed.replace(true) {
-            panic!("already borrowed");
-        }
+        assert!(!self.borrowed.replace(true), "already borrowed");
 
         AccessGuard(self)
     }
