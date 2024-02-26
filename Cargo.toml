@@ -6,3 +6,6 @@ edition = "2021"
 [dependencies]
 io-uring = "0.6"
 slab = "0.4"
+
+noop-waker = "0.1"
+async-task = "4"
