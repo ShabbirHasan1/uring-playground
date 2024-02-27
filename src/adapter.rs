@@ -1,6 +1,6 @@
 use std::{
     io::{Error, ErrorKind, Result},
-    os::fd::{AsRawFd, BorrowedFd},
+    os::fd::AsRawFd,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -12,15 +12,15 @@ use crate::reactor::{Operation, Reactor};
 
 /// Adapter to implement [`tokio::io`] traits backed by the typical syscalls
 /// and polling facilities from `io_uring` when encountering `EAGAIN`
-pub struct PollIo<'a> {
-    reactor: &'a Reactor,
-    file: BorrowedFd<'a>,
+pub struct PollIo<R, F> {
+    reactor: R,
+    file: F,
     poll: Option<Operation>,
 }
 
-impl<'a> PollIo<'a> {
+impl<R, F> PollIo<R, F> {
     /// Create the IO adapter backed by normal
-    pub const fn new(reactor: &'a Reactor, file: BorrowedFd<'a>) -> Self {
+    pub const fn new(reactor: R, file: F) -> Self {
         Self {
             reactor,
             file,
@@ -29,12 +29,16 @@ impl<'a> PollIo<'a> {
     }
 }
 
-impl<'a> PollIo<'a> {
+impl<R, F> PollIo<R, F>
+where
+    R: AsRef<Reactor>,
+    F: AsRawFd,
+{
     /// Register an internal poll operation
     fn register_poll(&mut self, flags: libc::c_short, context: &mut Context) -> Result<Operation> {
         // SAFETY: file bound to live long enough, not technically unsound either
         let handle = unsafe {
-            self.reactor.submit_operation(
+            self.reactor.as_ref().submit_operation(
                 PollAdd::new(Fd(self.file.as_raw_fd()), flags.try_into().unwrap()).build(),
                 context,
             )?
@@ -45,7 +49,11 @@ impl<'a> PollIo<'a> {
     }
 }
 
-impl<'a> AsyncRead for PollIo<'a> {
+impl<R, F> AsyncRead for PollIo<R, F>
+where
+    R: AsRef<Reactor> + Unpin,
+    F: AsRawFd + Unpin,
+{
     fn poll_read(
         self: Pin<&mut Self>,
         context: &mut Context,
@@ -54,7 +62,7 @@ impl<'a> AsyncRead for PollIo<'a> {
         let this = self.get_mut();
 
         if let Some(operation) = this.poll {
-            std::task::ready!(this.reactor.drive_operation(operation, context));
+            std::task::ready!(this.reactor.as_ref().drive_operation(operation, context));
             this.poll = None;
         }
 
@@ -95,7 +103,11 @@ impl<'a> AsyncRead for PollIo<'a> {
     }
 }
 
-impl<'a> AsyncWrite for PollIo<'a> {
+impl<R, F> AsyncWrite for PollIo<R, F>
+where
+    R: AsRef<Reactor> + Unpin,
+    F: AsRawFd + Unpin,
+{
     fn poll_write(
         self: Pin<&mut Self>,
         context: &mut Context,
@@ -104,7 +116,9 @@ impl<'a> AsyncWrite for PollIo<'a> {
         let this = self.get_mut();
 
         if let Some(operation) = this.poll {
-            let entry = std::task::ready!(this.reactor.drive_operation(operation, context));
+            let entry =
+                std::task::ready!(this.reactor.as_ref().drive_operation(operation, context));
+
             this.poll = None;
 
             if entry.result().is_negative() {
