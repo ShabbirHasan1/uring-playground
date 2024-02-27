@@ -1,12 +1,13 @@
 use std::{
     future::Future,
     io::{Error, Result},
-    os::fd::{AsRawFd, BorrowedFd},
+    os::fd::{AsRawFd, BorrowedFd, FromRawFd, OwnedFd},
     pin::Pin,
     task::{Context, Poll},
 };
 
 use io_uring::{cqueue, opcode, squeue, types};
+use socket2::SockAddr;
 
 use crate::{Operation, Reactor};
 
@@ -121,6 +122,61 @@ unsafe impl<'a> Oneshot for Read<'a> {
         unsafe { buffer.set_len(buffer.len() + amount_read) };
 
         Ok(buffer)
+    }
+}
+
+#[must_use]
+pub struct Accept<'a> {
+    file: BorrowedFd<'a>,
+    flags: libc::c_int,
+    address_storage: libc::sockaddr_storage,
+    address_length: libc::socklen_t,
+}
+
+impl<'a> Accept<'a> {
+    // this can't actually fail
+    #[allow(clippy::missing_panics_doc)]
+    pub fn new(file: BorrowedFd<'a>) -> Self {
+        // SAFETY: zero initialized adresses should be perfectly valid
+        Self {
+            file,
+            flags: 0,
+            address_storage: unsafe { std::mem::zeroed() },
+            address_length: std::mem::size_of::<libc::sockaddr_storage>()
+                .try_into()
+                .unwrap(),
+        }
+    }
+
+    pub const fn non_blocking(mut self) -> Self {
+        self.flags |= libc::SOCK_NONBLOCK;
+        self
+    }
+}
+
+/// SAFETY: lifetime bounds guarantee file and buffer validity
+unsafe impl<'a> Oneshot for Accept<'a> {
+    type Output = (OwnedFd, SockAddr);
+
+    fn build_submission(&mut self) -> squeue::Entry {
+        opcode::Accept::new(
+            types::Fd(self.file.as_raw_fd()),
+            std::ptr::addr_of_mut!(self.address_storage).cast(),
+            std::ptr::addr_of_mut!(self.address_length),
+        )
+        .flags(self.flags)
+        .build()
+    }
+
+    unsafe fn process_completion(&mut self, entry: cqueue::Entry) -> Result<Self::Output> {
+        if entry.result().is_negative() {
+            return Err(Error::from_raw_os_error(-entry.result()));
+        }
+
+        Ok((
+            OwnedFd::from_raw_fd(entry.result()),
+            SockAddr::new(self.address_storage, self.address_length),
+        ))
     }
 }
 

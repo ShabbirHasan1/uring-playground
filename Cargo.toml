@@ -19,3 +19,4 @@ async-task = "4"
 
 tokio = "1"
 libc = "0.2"
+socket2 = "0.5"
