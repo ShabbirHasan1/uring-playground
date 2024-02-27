@@ -153,11 +153,13 @@ where
         if let Some(operation) = this.handle {
             let entry = std::task::ready!(this.reactor.drive_operation(operation, context));
 
+            // SAFETY: we submitted the entry
             let output = unsafe { this.operation.process_completion(entry) };
 
             return Poll::Ready(output);
         }
 
+        // SAFETY: operation implenter guaranteed parameter validity
         let result = unsafe {
             this.reactor
                 .submit_operation(this.operation.build_submission(), context)
