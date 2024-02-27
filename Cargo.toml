@@ -17,5 +17,5 @@ slab = "0.4"
 noop-waker = "0.1"
 async-task = "4"
 
-futures-io = "0.3"
+tokio = "1"
 libc = "0.2"
