@@ -159,10 +159,8 @@ where
         }
 
         let result = unsafe {
-            this.reactor.submit_operation(
-                this.operation.build_submission(),
-                Some(context.waker().clone()),
-            )
+            this.reactor
+                .submit_operation(this.operation.build_submission(), context)
         };
 
         match result {

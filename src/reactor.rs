@@ -42,12 +42,12 @@ impl Reactor {
     pub unsafe fn submit_operation(
         &self,
         entry: squeue::Entry,
-        waker: Option<Waker>,
+        context: &mut Context,
     ) -> Result<Operation> {
         let index = self
             .operations
             .assume_unique_access()
-            .insert(waker.map_or(State::Submitted, State::Waiting));
+            .insert(State::Waiting(context.waker().clone()));
 
         let entry = entry.user_data(index.try_into().unwrap());
 
@@ -81,11 +81,6 @@ impl Reactor {
         let slot = guard.get_mut(operation.as_raw()).unwrap();
 
         match slot {
-            State::Submitted => {
-                *slot = State::Waiting(context.waker().clone());
-
-                Poll::Pending
-            }
             State::Waiting(waker) => {
                 if !waker.will_wake(context.waker()) {
                     context.waker().clone_into(waker);
@@ -151,9 +146,6 @@ impl Reactor {
                 .unwrap();
 
             match slot {
-                State::Submitted => {
-                    *slot = State::Completed(entry);
-                }
                 State::Waiting(_) => {
                     std::mem::replace(slot, State::Completed(entry))
                         .assume_as_waiting()
@@ -192,7 +184,6 @@ impl Operation {
 
 /// Internal state of an submitted operation
 enum State {
-    Submitted,
     Waiting(Waker),
     Completed(cqueue::Entry),
     Unclaimed(VecDeque<cqueue::Entry>),

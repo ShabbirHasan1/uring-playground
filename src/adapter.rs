@@ -2,7 +2,7 @@ use std::{
     io::{Error, ErrorKind, Read, Result, Write},
     os::fd::AsRawFd,
     pin::Pin,
-    task::{Context, Poll, Waker},
+    task::{Context, Poll},
 };
 
 use futures_io::{AsyncRead, AsyncWrite};
@@ -36,11 +36,11 @@ where
     I: AsRawFd + Unpin + 'a,
 {
     /// Register an internal poll operation
-    fn register_poll(&mut self, flags: libc::c_short, waker: Waker) -> Result<Operation> {
+    fn register_poll(&mut self, flags: libc::c_short, context: &mut Context) -> Result<Operation> {
         let handle = unsafe {
             self.reactor.submit_operation(
                 PollAdd::new(Fd(self.io.as_raw_fd()), flags.try_into().unwrap()).build(),
-                Some(waker),
+                context,
             )?
         };
 
@@ -72,7 +72,7 @@ where
                 Poll::Pending
             }
             Err(error) if error.kind() == ErrorKind::WouldBlock => {
-                if let Err(error) = this.register_poll(libc::POLLIN, context.waker().clone()) {
+                if let Err(error) = this.register_poll(libc::POLLIN, context) {
                     return Poll::Ready(Err(error));
                 }
 
@@ -111,7 +111,7 @@ where
                 Poll::Pending
             }
             Err(error) if error.kind() == ErrorKind::WouldBlock => {
-                if let Err(error) = this.register_poll(libc::POLLOUT, context.waker().clone()) {
+                if let Err(error) = this.register_poll(libc::POLLOUT, context) {
                     return Poll::Ready(Err(error));
                 }
 
