@@ -9,6 +9,6 @@ mod reactor;
 pub use crate::{
     adapter::PollIo,
     executor::{block_on, Executor},
-    operation::{Completion, Oneshot, Write},
+    operation::{Completion, Oneshot, Read, Write},
     reactor::{Operation, Reactor},
 };

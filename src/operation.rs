@@ -76,6 +76,54 @@ unsafe impl<'a> Oneshot for Write<'a> {
     }
 }
 
+#[must_use]
+pub struct Read<'a> {
+    file: BorrowedFd<'a>,
+    buffer: Vec<u8>,
+}
+
+impl<'a> Read<'a> {
+    pub const fn new(file: BorrowedFd<'a>, buffer: Vec<u8>) -> Self {
+        Self { file, buffer }
+    }
+}
+
+/// SAFETY: lifetime bounds guarantee file and buffer validity
+unsafe impl<'a> Oneshot for Read<'a> {
+    type Output = Vec<u8>;
+
+    fn build_submission(&mut self) -> squeue::Entry {
+        // SAFETY: the raw slice correctly points to the vector's uninitialized part
+        let (uninitialized_start, remaining_capacity) = unsafe {
+            (
+                self.buffer.as_ptr().add(self.buffer.len()),
+                self.buffer.capacity() - self.buffer.len(),
+            )
+        };
+
+        opcode::Write::new(
+            types::Fd(self.file.as_raw_fd()),
+            uninitialized_start,
+            remaining_capacity.try_into().unwrap(),
+        )
+        .build()
+    }
+
+    unsafe fn process_completion(&mut self, entry: cqueue::Entry) -> Result<Self::Output> {
+        let amount_read: usize = entry
+            .result()
+            .try_into()
+            .map_err(|_| Error::from_raw_os_error(-entry.result()))?;
+
+        let mut buffer = std::mem::take(&mut self.buffer);
+
+        // SAFETY: we only read up to capacity bytes and this amount got initialized
+        unsafe { buffer.set_len(buffer.len() + amount_read) };
+
+        Ok(buffer)
+    }
+}
+
 /// Future to wait for an oneshot operation to complete
 pub struct Completion<'a, O> {
     reactor: &'a Reactor,
