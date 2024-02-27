@@ -4,10 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [lints.clippy]
+future_not_send = { level = "allow", priority = 1 }
+
 all = "deny"
 pedantic = "warn"
 nursery = "warn"
-
 
 [dependencies]
 io-uring = "0.6"
