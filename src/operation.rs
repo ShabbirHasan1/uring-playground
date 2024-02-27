@@ -8,7 +8,7 @@ use std::{
 
 use io_uring::{cqueue, opcode, squeue, types};
 
-use crate::{OperationHandle, Reactor};
+use crate::{Operation, Reactor};
 
 /// Trait representing an abstract oneshot operation
 ///
@@ -80,7 +80,7 @@ unsafe impl<'a> Oneshot for Write<'a> {
 pub struct Completion<'a, O> {
     reactor: &'a Reactor,
     operation: O,
-    handle: Option<OperationHandle>,
+    handle: Option<Operation>,
 }
 
 impl<'a, O> Completion<'a, O> {

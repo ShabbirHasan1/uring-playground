@@ -8,14 +8,14 @@ use std::{
 use futures_io::{AsyncRead, AsyncWrite};
 use io_uring::{opcode::PollAdd, types::Fd};
 
-use crate::reactor::{OperationHandle, Reactor};
+use crate::reactor::{Operation, Reactor};
 
 /// Adapter to implement asynchronous IO traits backed by a standard libary
 /// implementation and the polling facilities from `io_uring` when encountering
 /// `EAGAIN`
 pub struct PollIo<'a, I> {
     reactor: &'a Reactor,
-    operation: Option<OperationHandle>,
+    operation: Option<Operation>,
     io: I,
 }
 
@@ -36,7 +36,7 @@ where
     I: AsRawFd + Unpin + 'a,
 {
     /// Register an internal poll operation
-    fn register_poll(&mut self, flags: libc::c_short, waker: Waker) -> Result<OperationHandle> {
+    fn register_poll(&mut self, flags: libc::c_short, waker: Waker) -> Result<Operation> {
         let handle = unsafe {
             self.reactor.submit_operation(
                 PollAdd::new(Fd(self.io.as_raw_fd()), flags.try_into().unwrap()).build(),

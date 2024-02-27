@@ -13,7 +13,7 @@ use crate::common::DangerCell;
 #[must_use]
 pub struct Reactor {
     ring: DangerCell<IoUring>,
-    operations: DangerCell<Slab<OperationState>>,
+    operations: DangerCell<Slab<State>>,
 }
 
 impl Reactor {
@@ -43,11 +43,11 @@ impl Reactor {
         &self,
         entry: squeue::Entry,
         waker: Option<Waker>,
-    ) -> Result<OperationHandle> {
+    ) -> Result<Operation> {
         let index = self
             .operations
             .assume_unique_access()
-            .insert(waker.map_or(OperationState::Submitted, OperationState::Waiting));
+            .insert(waker.map_or(State::Submitted, State::Waiting));
 
         let entry = entry.user_data(index.try_into().unwrap());
 
@@ -64,7 +64,7 @@ impl Reactor {
             })?;
         }
 
-        Ok(OperationHandle::from_raw(index))
+        Ok(Operation::from_raw(index))
     }
 
     /// Poll for the result of an in-flight operation
@@ -74,36 +74,36 @@ impl Reactor {
     /// If the operation handle is invalid
     pub fn drive_operation(
         &self,
-        operation: OperationHandle,
+        operation: Operation,
         context: &mut Context,
     ) -> Poll<cqueue::Entry> {
         let mut guard = self.operations.assume_unique_access();
         let slot = guard.get_mut(operation.as_raw()).unwrap();
 
         match slot {
-            OperationState::Submitted => {
-                *slot = OperationState::Waiting(context.waker().clone());
+            State::Submitted => {
+                *slot = State::Waiting(context.waker().clone());
 
                 Poll::Pending
             }
-            OperationState::Waiting(waker) => {
+            State::Waiting(waker) => {
                 if !waker.will_wake(context.waker()) {
                     context.waker().clone_into(waker);
                 }
 
                 Poll::Pending
             }
-            OperationState::Completed(entry) => {
+            State::Completed(entry) => {
                 if !cqueue::more(entry.flags()) {
                     return Poll::Ready(guard.remove(operation.as_raw()).assume_as_completed());
                 }
 
                 Poll::Ready(
-                    std::mem::replace(slot, OperationState::Waiting(context.waker().clone()))
+                    std::mem::replace(slot, State::Waiting(context.waker().clone()))
                         .assume_as_completed(),
                 )
             }
-            OperationState::Unclaimed(entries) => {
+            State::Unclaimed(entries) => {
                 let Some(entry) = entries.pop_front() else {
                     return Poll::Pending;
                 };
@@ -118,7 +118,7 @@ impl Reactor {
                     return Poll::Ready(entry);
                 }
 
-                *slot = OperationState::Waiting(context.waker().clone());
+                *slot = State::Waiting(context.waker().clone());
                 Poll::Ready(entry)
             }
         }
@@ -151,25 +151,23 @@ impl Reactor {
                 .unwrap();
 
             match slot {
-                OperationState::Submitted => {
-                    *slot = OperationState::Completed(entry);
+                State::Submitted => {
+                    *slot = State::Completed(entry);
                 }
-                OperationState::Waiting(_) => {
-                    std::mem::replace(slot, OperationState::Completed(entry))
+                State::Waiting(_) => {
+                    std::mem::replace(slot, State::Completed(entry))
                         .assume_as_waiting()
                         .wake();
                 }
-                OperationState::Completed(_) => {
-                    let previous = std::mem::replace(
-                        slot,
-                        OperationState::Unclaimed(VecDeque::with_capacity(2)),
-                    );
+                State::Completed(_) => {
+                    let previous =
+                        std::mem::replace(slot, State::Unclaimed(VecDeque::with_capacity(2)));
 
                     let entries = slot.assume_as_mut_unclaimed();
                     entries.push_back(previous.assume_as_completed());
                     entries.push_back(entry);
                 }
-                OperationState::Unclaimed(entries) => entries.push_back(entry),
+                State::Unclaimed(entries) => entries.push_back(entry),
             }
         }
 
@@ -177,12 +175,12 @@ impl Reactor {
     }
 }
 
-/// Strongly typed index referring to an [`OperationState`] instance
+/// Strongly typed index referring to a [`State`] instance
 #[derive(Clone, Copy)]
 #[must_use]
-pub struct OperationHandle(usize);
+pub struct Operation(usize);
 
-impl OperationHandle {
+impl Operation {
     const fn from_raw(index: usize) -> Self {
         Self(index)
     }
@@ -193,14 +191,14 @@ impl OperationHandle {
 }
 
 /// Internal state of an submitted operation
-enum OperationState {
+enum State {
     Submitted,
     Waiting(Waker),
     Completed(cqueue::Entry),
     Unclaimed(VecDeque<cqueue::Entry>),
 }
 
-impl OperationState {
+impl State {
     fn assume_as_waiting(self) -> Waker {
         if let Self::Waiting(waker) = self {
             return waker;
