@@ -18,7 +18,10 @@ use crate::reactor::{Operation, Reactor};
 pub struct PollIo {
     reactor: Rc<Reactor>,
     file: OwnedFd,
-    operation: Option<Operation>,
+    read: Option<Operation>,
+    write: Option<Operation>,
+    shutdown: Option<Operation>,
+    close: Option<Operation>,
 }
 
 impl PollIo {
@@ -27,23 +30,11 @@ impl PollIo {
         Self {
             reactor,
             file,
-            operation: None,
+            read: None,
+            write: None,
+            shutdown: None,
+            close: None,
         }
-    }
-
-    unsafe fn register_operation<T>(
-        &mut self,
-        entry: io_uring::squeue::Entry,
-        context: &mut Context,
-    ) -> Poll<Result<T>> {
-        // SAFETY: caller promises validity
-        unsafe { self.reactor.submit_operation(entry, context) }.map_or_else(
-            |error| Poll::Ready(Err(error)),
-            |handle| {
-                self.operation = Some(handle);
-                Poll::Pending
-            },
-        )
     }
 
     /// Attempt to read into the buffer
@@ -60,9 +51,9 @@ impl PollIo {
     ) -> Poll<Result<usize>> {
         let this = self.get_mut();
 
-        if let Some(handle) = this.operation {
+        if let Some(handle) = this.read {
             let entry = std::task::ready!(this.reactor.drive_operation(handle, context));
-            this.operation = None;
+            this.read = None;
 
             if entry.result().is_negative() {
                 return Poll::Ready(Err(Error::from_raw_os_error(-entry.result())));
@@ -88,11 +79,18 @@ impl PollIo {
             Err(error) if error.kind() == ErrorKind::WouldBlock => {
                 // SAFETY: file bound to live long enough
                 unsafe {
-                    this.register_operation(
+                    this.reactor.submit_operation(
                         PollAdd::new(Fd(this.file.as_raw_fd()), libc::POLLIN as _).build(),
                         context,
                     )
                 }
+                .map_or_else(
+                    |error| Poll::Ready(Err(error)),
+                    |handle| {
+                        this.read = Some(handle);
+                        Poll::Pending
+                    },
+                )
             }
             Err(error) => Poll::Ready(Err(error)),
         }
@@ -110,9 +108,9 @@ impl PollIo {
     ) -> Poll<Result<usize>> {
         let this = self.get_mut();
 
-        if let Some(handle) = this.operation {
+        if let Some(handle) = this.write {
             let entry = std::task::ready!(this.reactor.drive_operation(handle, context));
-            this.operation = None;
+            this.write = None;
 
             return Poll::Ready(
                 entry
@@ -124,7 +122,7 @@ impl PollIo {
 
         // SAFETY: valid pointer with correct length and file bound to live long enough
         unsafe {
-            this.register_operation(
+            this.reactor.submit_operation(
                 Write::new(
                     Fd(this.file.as_raw_fd()),
                     buffer.as_ptr(),
@@ -134,15 +132,22 @@ impl PollIo {
                 context,
             )
         }
+        .map_or_else(
+            |error| Poll::Ready(Err(error)),
+            |handle| {
+                this.write = Some(handle);
+                Poll::Pending
+            },
+        )
     }
 
     /// Attempt to shutdown the socket
     pub fn poll_shutdown(self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<()>> {
         let this = self.get_mut();
 
-        if let Some(handle) = this.operation {
+        if let Some(handle) = this.shutdown {
             let entry = std::task::ready!(this.reactor.drive_operation(handle, context));
-            this.operation = None;
+            this.shutdown = None;
 
             if entry.result().is_negative() {
                 return Poll::Ready(Err(Error::from_raw_os_error(-entry.result())));
@@ -153,20 +158,27 @@ impl PollIo {
 
         // SAFETY: file bound to live long enough
         unsafe {
-            this.register_operation(
+            this.reactor.submit_operation(
                 Shutdown::new(Fd(this.file.as_raw_fd()), libc::SHUT_WR).build(),
                 context,
             )
         }
+        .map_or_else(
+            |error| Poll::Ready(Err(error)),
+            |handle| {
+                this.shutdown = Some(handle);
+                Poll::Pending
+            },
+        )
     }
 
     /// Attempt to close the file
     pub fn poll_close(self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<()>> {
         let this = self.get_mut();
 
-        if let Some(handle) = this.operation {
+        if let Some(handle) = this.close {
             let entry = std::task::ready!(this.reactor.drive_operation(handle, context));
-            this.operation = None;
+            this.close = None;
 
             if entry.result().is_negative() {
                 return Poll::Ready(Err(Error::from_raw_os_error(-entry.result())));
@@ -176,7 +188,17 @@ impl PollIo {
         }
 
         // SAFETY: file bound to live long enough
-        unsafe { this.register_operation(Close::new(Fd(this.file.as_raw_fd())).build(), context) }
+        unsafe {
+            this.reactor
+                .submit_operation(Close::new(Fd(this.file.as_raw_fd())).build(), context)
+        }
+        .map_or_else(
+            |error| Poll::Ready(Err(error)),
+            |handle| {
+                this.close = Some(handle);
+                Poll::Pending
+            },
+        )
     }
 }
 
