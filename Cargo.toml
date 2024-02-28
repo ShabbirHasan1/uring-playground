@@ -10,6 +10,11 @@ all = "deny"
 pedantic = "warn"
 nursery = "warn"
 
+[features]
+default = ["tokio-io"]
+tokio-io = ["dep:tokio"]
+futures-io = ["dep:futures-io"]
+
 [dependencies]
 io-uring = "0.6"
 slab = "0.4"
@@ -17,6 +22,8 @@ slab = "0.4"
 noop-waker = "0.1"
 async-task = "4"
 
-tokio = "1"
 libc = "0.2"
 socket2 = "0.5"
+
+tokio = { version = "1", optional = true }
+futures-io = { version = "0.3", optional = true }
