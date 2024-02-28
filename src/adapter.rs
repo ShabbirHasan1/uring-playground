@@ -31,6 +31,21 @@ impl PollIo {
         }
     }
 
+    unsafe fn register_operation<T>(
+        &mut self,
+        entry: io_uring::squeue::Entry,
+        context: &mut Context,
+    ) -> Poll<Result<T>> {
+        // SAFETY: caller promises validity
+        unsafe { self.reactor.submit_operation(entry, context) }.map_or_else(
+            |error| Poll::Ready(Err(error)),
+            |handle| {
+                self.operation = Some(handle);
+                Poll::Pending
+            },
+        )
+    }
+
     /// Attempt to read into the buffer
     ///
     /// # Note
@@ -72,19 +87,11 @@ impl PollIo {
             }
             Err(error) if error.kind() == ErrorKind::WouldBlock => {
                 // SAFETY: file bound to live long enough
-                let result = unsafe {
-                    this.reactor.submit_operation(
+                unsafe {
+                    this.register_operation(
                         PollAdd::new(Fd(this.file.as_raw_fd()), libc::POLLIN as _).build(),
                         context,
                     )
-                };
-
-                match result {
-                    Ok(handle) => {
-                        this.operation = Some(handle);
-                        Poll::Pending
-                    }
-                    Err(error) => Poll::Ready(Err(error)),
                 }
             }
             Err(error) => Poll::Ready(Err(error)),
@@ -116,8 +123,8 @@ impl PollIo {
         }
 
         // SAFETY: valid pointer with correct length and file bound to live long enough
-        let result = unsafe {
-            this.reactor.submit_operation(
+        unsafe {
+            this.register_operation(
                 Write::new(
                     Fd(this.file.as_raw_fd()),
                     buffer.as_ptr(),
@@ -126,14 +133,6 @@ impl PollIo {
                 .build(),
                 context,
             )
-        };
-
-        match result {
-            Ok(handle) => {
-                this.operation = Some(handle);
-                Poll::Pending
-            }
-            Err(error) => Poll::Ready(Err(error)),
         }
     }
 
@@ -153,19 +152,11 @@ impl PollIo {
         }
 
         // SAFETY: file bound to live long enough
-        let result = unsafe {
-            this.reactor.submit_operation(
+        unsafe {
+            this.register_operation(
                 Shutdown::new(Fd(this.file.as_raw_fd()), libc::SHUT_WR).build(),
                 context,
             )
-        };
-
-        match result {
-            Ok(handle) => {
-                this.operation = Some(handle);
-                Poll::Pending
-            }
-            Err(error) => Poll::Ready(Err(error)),
         }
     }
 
@@ -185,19 +176,7 @@ impl PollIo {
         }
 
         // SAFETY: file bound to live long enough
-        let result = unsafe {
-            this.reactor
-                .as_ref()
-                .submit_operation(Close::new(Fd(this.file.as_raw_fd())).build(), context)
-        };
-
-        match result {
-            Ok(handle) => {
-                this.operation = Some(handle);
-                Poll::Pending
-            }
-            Err(error) => Poll::Ready(Err(error)),
-        }
+        unsafe { this.register_operation(Close::new(Fd(this.file.as_raw_fd())).build(), context) }
     }
 }
 
