@@ -10,6 +10,8 @@ nursery = "warn"
 
 [dependencies]
 io-uring = { workspace = true }
+socket2 = { workspace = true }
+
 uring-reactor = { workspace = true }
 uring-adapter = { workspace = true, features = ["tokio-io"] }
 uring-operation = { workspace = true }
