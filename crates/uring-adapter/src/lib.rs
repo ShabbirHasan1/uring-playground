@@ -255,14 +255,13 @@ mod futures_io {
     use std::{
         io::Result,
         mem::MaybeUninit,
-        os::fd::AsRawFd,
         pin::Pin,
         task::{Context, Poll},
     };
 
     use futures_io::{AsyncRead, AsyncWrite};
 
-    use crate::adapter::PollIo;
+    use crate::PollIo;
 
     impl AsyncRead for PollIo {
         fn poll_read(
