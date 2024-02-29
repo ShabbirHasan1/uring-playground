@@ -4,11 +4,17 @@ version = "0.1.0"
 edition = "2021"
 
 [lints.clippy]
-future_not_send = { level = "allow", priority = 1 }
-
 all = "deny"
 pedantic = "warn"
 nursery = "warn"
+
+[lints.clippy.future_not_send]
+level = "allow"
+priority = 1
+
+[lints.clippy.new-without-default]
+level = "allow"
+priority = 1
 
 [features]
 default = ["tokio-io"]
