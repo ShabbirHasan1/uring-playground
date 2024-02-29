@@ -8,7 +8,7 @@ use std::{
 };
 
 use io_uring::{
-    opcode::{Close, PollAdd, Shutdown, Write},
+    opcode::{AsyncCancel, Close, PollAdd, Shutdown, Write},
     types::Fd,
 };
 use uring_reactor::{Operation, Reactor};
@@ -140,34 +140,85 @@ impl PollIo {
     }
 
     /// Attempt to shutdown the socket
+    ///
+    /// # Panics
+    ///
+    /// If an internal operation handle overflows user data storage
+    ///
+    /// # Note
+    ///
+    /// This method cancels read and write operations if they haven't completed
     pub fn poll_shutdown(self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<()>> {
         let this = self.get_mut();
+        let mut dummy = None;
+        let remaining = if this.read.is_some() {
+            &mut this.read
+        } else if this.write.is_none() {
+            &mut this.write
+        } else {
+            &mut dummy
+        };
 
-        if let Some(handle) = this.shutdown {
-            let entry = std::task::ready!(this.reactor.drive_operation(handle, context));
-            this.shutdown = None;
-
-            if entry.result().is_negative() {
-                return Poll::Ready(Err(Error::from_raw_os_error(-entry.result())));
+        match (remaining, this.shutdown) {
+            // There is a operation that we need to cancel
+            (Some(handle), None) => {
+                // SAFETY: we don't set any parameters that can get invalidated
+                unsafe {
+                    this.reactor.submit_operation(
+                        AsyncCancel::new(handle.as_raw().try_into().unwrap()).build(),
+                        context,
+                    )
+                }
+                .map_or_else(
+                    |error| Poll::Ready(Err(error)),
+                    |handle| {
+                        this.shutdown = Some(handle);
+                        Poll::Pending
+                    },
+                )
             }
+            // We're waiting for a cancellation
+            (slot @ Some(_), Some(handle)) => {
+                let entry = std::task::ready!(this.reactor.drive_operation(handle, context));
+                this.shutdown = None;
+                *slot = None;
 
-            return Poll::Ready(Ok(()));
-        }
+                if entry.result().is_negative() {
+                    Poll::Ready(Err(Error::from_raw_os_error(-entry.result())))
+                } else {
+                    context.waker().wake_by_ref();
+                    Poll::Pending
+                }
+            }
+            // Ready to shutdown
+            (None, None) => {
+                // SAFETY: file bound to live long enough
+                unsafe {
+                    this.reactor.submit_operation(
+                        Shutdown::new(Fd(this.file.as_raw_fd()), libc::SHUT_WR).build(),
+                        context,
+                    )
+                }
+                .map_or_else(
+                    |error| Poll::Ready(Err(error)),
+                    |handle| {
+                        this.shutdown = Some(handle);
+                        Poll::Pending
+                    },
+                )
+            }
+            // We're waiting for the shutdown
+            (None, Some(handle)) => {
+                let entry = std::task::ready!(this.reactor.drive_operation(handle, context));
+                this.shutdown = None;
 
-        // SAFETY: file bound to live long enough
-        unsafe {
-            this.reactor.submit_operation(
-                Shutdown::new(Fd(this.file.as_raw_fd()), libc::SHUT_WR).build(),
-                context,
-            )
+                if entry.result().is_negative() {
+                    Poll::Ready(Err(Error::from_raw_os_error(-entry.result())))
+                } else {
+                    Poll::Ready(Ok(()))
+                }
+            }
         }
-        .map_or_else(
-            |error| Poll::Ready(Err(error)),
-            |handle| {
-                this.shutdown = Some(handle);
-                Poll::Pending
-            },
-        )
     }
 
     /// Attempt to close the file
