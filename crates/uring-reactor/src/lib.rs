@@ -5,9 +5,8 @@ use std::{
 };
 
 use io_uring::{cqueue, squeue, IoUring};
+use local_danger_cell::DangerCell;
 use slab::Slab;
-
-use crate::common::DangerCell;
 
 /// Simple IO reactor for making `io_uring` operations
 #[must_use]
@@ -17,7 +16,6 @@ pub struct Reactor {
 }
 
 impl Reactor {
-    /// Create a new reactor with the provided ring instance
     pub const fn new(ring: IoUring) -> Self {
         Self {
             ring: DangerCell::new(ring),

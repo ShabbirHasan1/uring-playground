@@ -11,8 +11,7 @@ use io_uring::{
     opcode::{Close, PollAdd, Shutdown, Write},
     types::Fd,
 };
-
-use crate::reactor::{Operation, Reactor};
+use uring_reactor::{Operation, Reactor};
 
 /// Adapter to implement common IO traits backed by `io_uring`
 pub struct PollIo {
@@ -25,7 +24,6 @@ pub struct PollIo {
 }
 
 impl PollIo {
-    /// Create the IO adapter backed by normal
     pub const fn new(reactor: Rc<Reactor>, file: OwnedFd) -> Self {
         Self {
             reactor,
@@ -212,7 +210,7 @@ mod tokio_io {
 
     use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
-    use crate::adapter::PollIo;
+    use crate::PollIo;
 
     impl AsyncRead for PollIo {
         fn poll_read(

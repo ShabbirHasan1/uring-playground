@@ -1,0 +1,19 @@
+[package]
+name = "uring-operation"
+version = "0.1.0"
+edition = "2021"
+
+[lints.clippy]
+all = "deny"
+pedantic = "warn"
+nursery = "warn"
+
+[lints.clippy.future_not_send]
+level = "allow"
+priority = 1
+
+[dependencies]
+uring-reactor = { workspace = true }
+io-uring = { workspace = true }
+socket2 = { workspace = true }
+libc = { workspace = true }

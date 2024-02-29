@@ -7,8 +7,7 @@ use std::{
 
 use io_uring::{cqueue, opcode::Accept, squeue, types::Fd};
 use socket2::SockAddr;
-
-use crate::Reactor;
+use uring_reactor::Reactor;
 
 /// Submit an oneshot operation and wait for it to complete
 ///

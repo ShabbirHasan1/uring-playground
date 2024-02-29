@@ -22,6 +22,11 @@ impl<T> DangerCell<T> {
         }
     }
 
+    /// Take mutable access to the stored value
+    ///
+    /// # Panics
+    ///
+    /// If the value is currently borrowed elsewhere
     pub fn assume_unique_access(&self) -> AccessGuard<'_, T> {
         assert!(!self.borrowed.replace(true), "already borrowed");
 

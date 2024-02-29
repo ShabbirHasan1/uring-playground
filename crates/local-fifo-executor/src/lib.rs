@@ -5,8 +5,7 @@ use std::{
 };
 
 use async_task::{Runnable, Task};
-
-use crate::common::DangerCell;
+use local_danger_cell::DangerCell;
 
 /// Simple poll loop for driving a future to completion concurretly with a
 /// ticker function to act as an event loop
@@ -39,7 +38,6 @@ pub struct Executor {
 }
 
 impl Executor {
-    /// Create a new single threaded FIFO async executor
     pub const fn new() -> Self {
         Self {
             tasks: DangerCell::new(VecDeque::new()),

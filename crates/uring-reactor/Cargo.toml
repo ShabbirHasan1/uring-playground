@@ -1,0 +1,14 @@
+[package]
+name = "uring-reactor"
+version = "0.1.0"
+edition = "2021"
+
+[lints.clippy]
+all = "deny"
+pedantic = "warn"
+nursery = "warn"
+
+[dependencies]
+io-uring = { workspace = true }
+slab = { workspace = true }
+local-danger-cell = { workspace = true }

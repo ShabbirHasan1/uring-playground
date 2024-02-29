@@ -1,27 +1,15 @@
-[package]
-name = "uring-playground"
-version = "0.1.0"
-edition = "2021"
+[workspace]
+resolver = "2"
+members = ["crates/*", "examples/*"]
 
-[lints.clippy]
-all = "deny"
-pedantic = "warn"
-nursery = "warn"
+[workspace.dependencies]
+uring-reactor = { path = "crates/uring-reactor" }
+uring-operation = { path = "crates/uring-operation" }
+uring-adapter = { path = "crates/uring-adapter" }
 
-[lints.clippy.future_not_send]
-level = "allow"
-priority = 1
+local-fifo-executor = { path = "crates/local-fifo-executor" }
+local-danger-cell = { path = "crates/local-danger-cell" }
 
-[lints.clippy.new-without-default]
-level = "allow"
-priority = 1
-
-[features]
-default = ["tokio-io"]
-tokio-io = ["dep:tokio"]
-futures-io = ["dep:futures-io"]
-
-[dependencies]
 io-uring = "0.6"
 slab = "0.4"
 
@@ -30,9 +18,3 @@ async-task = "4"
 
 libc = "0.2"
 socket2 = "0.5"
-
-tokio = { version = "1", optional = true }
-futures-io = { version = "0.3", optional = true }
-
-hyper = { version = "1", features = ["server", "http1"] }
-hyper-util = { version = "0.1", features = ["tokio"] }

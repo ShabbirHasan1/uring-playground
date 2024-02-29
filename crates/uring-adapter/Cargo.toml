@@ -1,0 +1,21 @@
+[package]
+name = "uring-adapter"
+version = "0.1.0"
+edition = "2021"
+
+[lints.clippy]
+all = "deny"
+pedantic = "warn"
+nursery = "warn"
+
+[features]
+tokio-io = ["dep:tokio"]
+futures-io = ["dep:futures-io"]
+
+[dependencies]
+uring-reactor = { workspace = true }
+io-uring = { workspace = true }
+libc = { workspace = true }
+
+tokio = { version = "1", optional = true }
+futures-io = { version = "0.3", optional = true }
