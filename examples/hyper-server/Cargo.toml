@@ -10,15 +10,15 @@ nursery = "warn"
 
 [dependencies]
 io-uring = { workspace = true }
-socket2 = { workspace = true }
+socket2 = { workspace = true, features = ["all"] }
 
 uring-reactor = { workspace = true }
-uring-adapter = { workspace = true, features = ["tokio-io"] }
+uring-adapter = { workspace = true, features = ["hyper-io"] }
 uring-operation = { workspace = true }
 
 local-fifo-executor = { workspace = true }
 
 hyper = { version = "1", features = ["server", "http1"] }
-hyper-util = { version = "0.1", features = ["tokio"] }
+hyper-util = { version = "0.1" }
 
 clap = { version = "4", features = ["derive", "env"] }

@@ -2,7 +2,6 @@ use std::{io::Result, net::SocketAddr, num::NonZeroUsize, os::fd::AsFd, rc::Rc};
 
 use clap::Parser;
 use hyper::{header::CONTENT_TYPE, server::conn::http1::Builder, Response, StatusCode};
-use hyper_util::rt::TokioIo;
 use io_uring::IoUring;
 use local_fifo_executor::Executor;
 use socket2::{Protocol, SockAddr, Socket, Type};
@@ -49,7 +48,7 @@ fn start(arguments: &Arguments, index: usize) -> Result<()> {
 
             let address = address.as_socket().unwrap();
             let connection = Builder::new().serve_connection(
-                TokioIo::new(PollIo::new(reactor.clone(), stream)),
+                PollIo::new(reactor.clone(), stream),
                 hyper::service::service_fn(move |_| async move {
                     let message = format!("Hello to you {address} from worker {index}\n");
 
