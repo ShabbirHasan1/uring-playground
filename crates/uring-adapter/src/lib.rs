@@ -295,3 +295,48 @@ mod futures_io {
         }
     }
 }
+
+#[cfg(feature = "hyper-io")]
+mod hyper_io {
+    use std::{
+        io::Result,
+        pin::Pin,
+        task::{Context, Poll},
+    };
+
+    use hyper::rt::{Read, ReadBufCursor, Write};
+
+    use crate::PollIo;
+
+    impl Read for PollIo {
+        fn poll_read(
+            self: Pin<&mut Self>,
+            context: &mut Context,
+            mut buffer: ReadBufCursor,
+        ) -> Poll<Result<()>> {
+            // SAFETY: doesn't uninitialize memory and correctly advances
+            unsafe {
+                self.poll_read(context, buffer.as_mut())
+                    .map(|result| result.map(|amount| buffer.advance(amount)))
+            }
+        }
+    }
+
+    impl Write for PollIo {
+        fn poll_write(
+            self: Pin<&mut Self>,
+            context: &mut Context,
+            buffer: &[u8],
+        ) -> Poll<Result<usize>> {
+            self.poll_write(context, buffer)
+        }
+
+        fn poll_flush(self: Pin<&mut Self>, _: &mut Context) -> Poll<Result<()>> {
+            Poll::Ready(Ok(()))
+        }
+
+        fn poll_shutdown(self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<()>> {
+            self.poll_shutdown(context)
+        }
+    }
+}
