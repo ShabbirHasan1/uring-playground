@@ -175,7 +175,8 @@ impl Operation {
         Self(index)
     }
 
-    const fn as_raw(self) -> usize {
+    #[must_use]
+    pub const fn as_raw(self) -> usize {
         self.0
     }
 }
