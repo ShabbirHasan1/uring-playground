@@ -11,7 +11,6 @@ nursery = "warn"
 [features]
 hyper-io = ["dep:hyper"]
 tokio-io = ["dep:tokio"]
-futures-io = ["dep:futures-io"]
 
 [dependencies]
 uring-reactor = { workspace = true }
@@ -20,4 +19,3 @@ libc = { workspace = true }
 
 hyper = { version = "1", optional = true }
 tokio = { version = "1", optional = true }
-futures-io = { version = "0.3", optional = true }

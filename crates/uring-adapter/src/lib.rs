@@ -251,6 +251,10 @@ impl PollIo {
     }
 }
 
+impl Drop for PollIo {
+    fn drop(&mut self) {}
+}
+
 #[cfg(feature = "tokio-io")]
 mod tokio_io {
     use std::{
@@ -297,51 +301,6 @@ mod tokio_io {
 
         fn poll_shutdown(self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<()>> {
             self.poll_shutdown(context)
-        }
-    }
-}
-
-#[cfg(feature = "futures-io")]
-mod futures_io {
-    use std::{
-        io::Result,
-        mem::MaybeUninit,
-        pin::Pin,
-        task::{Context, Poll},
-    };
-
-    use futures_io::{AsyncRead, AsyncWrite};
-
-    use crate::PollIo;
-
-    impl AsyncRead for PollIo {
-        fn poll_read(
-            self: Pin<&mut Self>,
-            context: &mut Context,
-            buffer: &mut [u8],
-        ) -> Poll<Result<usize>> {
-            // SAFETY: doesn't uninitialize memory
-            self.poll_read(context, unsafe {
-                &mut *(std::ptr::from_mut(buffer) as *mut [MaybeUninit<u8>])
-            })
-        }
-    }
-
-    impl AsyncWrite for PollIo {
-        fn poll_write(
-            self: Pin<&mut Self>,
-            context: &mut Context,
-            buffer: &[u8],
-        ) -> Poll<Result<usize>> {
-            self.poll_write(context, buffer)
-        }
-
-        fn poll_flush(self: Pin<&mut Self>, _: &mut Context) -> Poll<Result<()>> {
-            todo!()
-        }
-
-        fn poll_close(self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<()>> {
-            self.poll_close(context)
         }
     }
 }
