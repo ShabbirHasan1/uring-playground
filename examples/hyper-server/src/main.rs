@@ -6,6 +6,7 @@ use io_uring::IoUring;
 use local_fifo_executor::Executor;
 use socket2::{Protocol, SockAddr, Socket, Type};
 use uring_adapter::PollIo;
+use uring_operation::AcceptFlags;
 use uring_reactor::Reactor;
 
 #[derive(Debug, Parser)]
@@ -44,7 +45,9 @@ fn start(arguments: &Arguments, index: usize) -> Result<()> {
 
     let task = executor.spawn(async {
         loop {
-            let (stream, address) = uring_operation::accept(&reactor, socket.as_fd()).await?;
+            let (stream, address) =
+                uring_operation::accept(&reactor, socket.as_fd(), AcceptFlags::NON_BLOCKING)
+                    .await?;
 
             let address = address.as_socket().unwrap();
             let connection = Builder::new().serve_connection(
