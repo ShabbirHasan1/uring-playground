@@ -1,16 +1,14 @@
 use std::{
     cell::{Cell, UnsafeCell},
-    marker::PhantomData,
     ops::{Deref, DerefMut},
 };
 
-/// An runtime checked [`UnsafeCell`] alternative marked as `!Send` and
-/// providing a minimal interface for accesses assumed as unique
+/// Runtime checked [`UnsafeCell`] alternative marked providing a minimal
+/// interface for accesses assumed as unique
 #[derive(Default)]
 pub struct DangerCell<T> {
     storage: UnsafeCell<T>,
     borrowed: Cell<bool>,
-    marker: PhantomData<*mut T>,
 }
 
 impl<T> DangerCell<T> {
@@ -18,7 +16,6 @@ impl<T> DangerCell<T> {
         Self {
             storage: UnsafeCell::new(value),
             borrowed: Cell::new(false),
-            marker: PhantomData,
         }
     }
 

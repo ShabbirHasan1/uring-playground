@@ -8,7 +8,7 @@ uring-operation = { path = "crates/uring-operation" }
 uring-adapter = { path = "crates/uring-adapter" }
 
 local-fifo-executor = { path = "crates/local-fifo-executor" }
-local-danger-cell = { path = "crates/local-danger-cell" }
+danger-cell = { path = "crates/danger-cell" }
 
 io-uring = "0.6"
 slab = "0.4"

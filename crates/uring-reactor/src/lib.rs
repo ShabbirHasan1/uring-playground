@@ -4,8 +4,8 @@ use std::{
     task::{Context, Poll, Waker},
 };
 
+use danger_cell::DangerCell;
 use io_uring::{cqueue, squeue, IoUring};
-use local_danger_cell::DangerCell;
 use slab::Slab;
 
 /// Simple IO reactor for making `io_uring` operations

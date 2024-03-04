@@ -5,7 +5,7 @@ use std::{
 };
 
 use async_task::{Runnable, Task};
-use local_danger_cell::DangerCell;
+use danger_cell::DangerCell;
 
 /// Simple poll loop for driving a future to completion concurretly with a
 /// ticker function to act as an event loop

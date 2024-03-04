@@ -15,4 +15,4 @@ priority = 1
 [dependencies]
 async-task = { workspace = true }
 noop-waker = { workspace = true }
-local-danger-cell = { workspace = true }
+danger-cell = { workspace = true }
