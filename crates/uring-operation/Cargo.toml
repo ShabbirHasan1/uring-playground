@@ -14,7 +14,11 @@ priority = 1
 
 [dependencies]
 uring-reactor = { workspace = true }
+futures-core = { workspace = true }
+
 io-uring = { workspace = true }
 socket2 = { workspace = true }
 libc = { workspace = true }
+
 bitflags = { workspace = true }
+pin-project-lite = { workspace = true }
