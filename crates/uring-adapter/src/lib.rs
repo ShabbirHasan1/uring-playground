@@ -11,16 +11,16 @@ use io_uring::{
     opcode::{AsyncCancel, Close, PollAdd, Shutdown, Write},
     types::Fd,
 };
-use uring_reactor::{Operation, Reactor};
+use uring_reactor::{OperationId, Reactor};
 
 /// Adapter to implement common IO traits backed by `io_uring`
 pub struct PollIo {
     reactor: Rc<Reactor>,
     file: OwnedFd,
-    read: Option<Operation>,
-    write: Option<Operation>,
-    shutdown: Option<Operation>,
-    close: Option<Operation>,
+    read: Option<OperationId>,
+    write: Option<OperationId>,
+    shutdown: Option<OperationId>,
+    close: Option<OperationId>,
 }
 
 impl PollIo {

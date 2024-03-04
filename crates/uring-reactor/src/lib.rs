@@ -41,7 +41,7 @@ impl Reactor {
         &self,
         entry: squeue::Entry,
         context: &mut Context,
-    ) -> Result<Operation> {
+    ) -> Result<OperationId> {
         let index = self
             .operations
             .assume_unique_access()
@@ -62,7 +62,7 @@ impl Reactor {
             })?;
         }
 
-        Ok(Operation::from_raw(index))
+        Ok(OperationId::from_raw(index))
     }
 
     /// Poll for the result of an in-flight operation
@@ -72,7 +72,7 @@ impl Reactor {
     /// If the operation handle is invalid
     pub fn drive_operation(
         &self,
-        operation: Operation,
+        operation: OperationId,
         context: &mut Context,
     ) -> Poll<cqueue::Entry> {
         let mut guard = self.operations.assume_unique_access();
@@ -168,9 +168,9 @@ impl Reactor {
 /// Strongly typed index referring to a [`State`] instance
 #[derive(Clone, Copy)]
 #[must_use]
-pub struct Operation(usize);
+pub struct OperationId(usize);
 
-impl Operation {
+impl OperationId {
     const fn from_raw(index: usize) -> Self {
         Self(index)
     }
